@@ -1,4 +1,3 @@
-%%writefile app.py
 import streamlit as st
 from models import SessionLocal, User, Product, Address, Order, OrderItem
 import utils
