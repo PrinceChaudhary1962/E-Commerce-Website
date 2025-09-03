@@ -49,10 +49,12 @@ def signup():
     st.subheader("Sign Up")
     email = st.text_input("Email", key="signup_email")
     password = st.text_input("Password", type="password", key="signup_pass")
+    
     if st.button("Send OTP"):
-        otp_data = utils.create_and_send_otp(email)
-        st.session_state.otp_code = otp_data["code"]
-        st.info(f"OTP sent to your email. (Dev: {otp_data['code']})")
+        otp_code = utils.create_and_send_otp(email)  # returns string
+        st.session_state.otp_code = otp_code
+        st.info(f"OTP sent to your email. (Dev: {otp_code})")  # for dev/testing
+
     otp = st.text_input("Enter OTP", key="signup_otp")
     if st.button("Verify & Sign Up"):
         if otp == st.session_state.get("otp_code"):
@@ -64,6 +66,11 @@ def signup():
             DB.add(new_user)
             DB.commit()
             st.success("Signup successful! Please login.")
+            # clear OTP and inputs
+            st.session_state.otp_code = None
+            st.session_state.signup_email = ""
+            st.session_state.signup_pass = ""
+            st.session_state.signup_otp = ""
         else:
             st.error("Invalid OTP")
 
