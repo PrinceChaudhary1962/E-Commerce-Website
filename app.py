@@ -11,16 +11,16 @@ Base.metadata.create_all(engine)
 DB = sessionmaker(bind=engine)()
 
 # Seed admin account
-if not DB.query(User).filter(User.email=="vivv.plays@egmail.com").first():
+if not DB.query(User).filter(User.email=="vivv.plays@gmail.com").first():
     admin = User(
-        email="admin@example.com",
+        email="vivv.plays@gmail.com",
         password_hash=utils.hash_password("adminpass"),
         role="admin",
         is_verified=True
     )
     DB.add(admin)
     DB.commit()
-    print("Admin created: admin@example.com / adminpass")
+    print("Admin created: vivv.plays@gmail.com / adminpass")
 
 # -----------------------
 # Session state defaults
