@@ -4,10 +4,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import datetime
 
-engine = create_engine("sqlite:///database.db", connect_args={"check_same_thread": False})
+# -----------------------
+# Database setup
+# -----------------------
+engine = create_engine(
+    "sqlite:///database.db",
+    connect_args={"check_same_thread": False}
+)
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 
+# -----------------------
+# User model
+# -----------------------
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -17,9 +26,12 @@ class User(Base):
     role = Column(String, default="customer")  # 'admin' or 'customer'
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    addresses = relationship("Address", back_populates="user")
-    orders = relationship("Order", back_populates="user")
+    addresses = relationship("Address", back_populates="user", cascade="all, delete")
+    orders = relationship("Order", back_populates="user", cascade="all, delete")
 
+# -----------------------
+# OTP model
+# -----------------------
 class OTP(Base):
     __tablename__ = "otps"
     id = Column(Integer, primary_key=True, index=True)
@@ -27,13 +39,20 @@ class OTP(Base):
     code = Column(String)
     expires_at = Column(DateTime)
 
+# -----------------------
+# Product model (with image support)
+# -----------------------
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     price = Column(Float, nullable=False)
     description = Column(Text)
+    image_path = Column(String, nullable=True)  # <-- path to image file
 
+# -----------------------
+# Address model
+# -----------------------
 class Address(Base):
     __tablename__ = "addresses"
     id = Column(Integer, primary_key=True, index=True)
@@ -44,6 +63,9 @@ class Address(Base):
 
     user = relationship("User", back_populates="addresses")
 
+# -----------------------
+# Order and OrderItem models
+# -----------------------
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
@@ -54,7 +76,7 @@ class Order(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order")
+    items = relationship("OrderItem", back_populates="order", cascade="all, delete")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -65,6 +87,10 @@ class OrderItem(Base):
     price = Column(Float)
 
     order = relationship("Order", back_populates="items")
-    # product relationship optional to fetch details
+    # optional: relationship to product if needed
+    # product = relationship("Product")
 
+# -----------------------
+# Create tables
+# -----------------------
 Base.metadata.create_all(engine)
