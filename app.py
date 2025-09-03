@@ -25,9 +25,17 @@ if not DB.query(User).filter(User.email=="admin@example.com").first():
 # -----------------------
 # Session state defaults
 # -----------------------
-for key in ["user", "cart", "otp_code", "signup_email", "signup_pass", "signup_otp"]:
+defaults = {
+    "user": None,
+    "cart": {},
+    "otp_code": None,
+    "signup_email": "",
+    "signup_pass": "",
+    "signup_otp": ""
+}
+for key, val in defaults.items():
     if key not in st.session_state:
-        st.session_state[key] = None if key == "user" else {}
+        st.session_state[key] = val
 
 # -----------------------
 # Authentication
@@ -41,6 +49,7 @@ def login():
         if user and utils.verify_password(password, user.password_hash):
             st.session_state["user"] = user
             st.success(f"Logged in as {user.role}")
+            st.experimental_rerun()  # <-- triggers dashboard reload
         else:
             st.error("Invalid credentials")
 
@@ -71,11 +80,12 @@ def signup():
                 DB.add(new_user)
                 DB.commit()
                 st.success("Signup successful! Please login.")
-                # Clear session state
+                # clear session state keys
                 st.session_state["signup_email"] = ""
                 st.session_state["signup_pass"] = ""
                 st.session_state["signup_otp"] = ""
                 st.session_state["otp_code"] = None
+                st.experimental_rerun()  # <-- reload to login screen
         else:
             st.error("Invalid OTP")
 
@@ -157,6 +167,7 @@ if st.session_state["user"]:
     if st.button("Logout"):
         st.session_state["user"] = None
         st.session_state["cart"] = {}
+        st.experimental_rerun()  # <-- reload login/signup
 else:
     tab = st.radio("Choose", ["Login", "Sign Up"])
     if tab=="Login":
