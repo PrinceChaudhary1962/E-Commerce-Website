@@ -3,20 +3,22 @@ import smtplib
 import random
 import datetime
 from email.message import EmailMessage
-from passlib.hash import bcrypt
 import qrcode
 from io import BytesIO
+from passlib.context import CryptContext  # fixed
 
 from models import SessionLocal, OTP
 
 DB = SessionLocal()
 
 # --- Password hashing ---
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 def hash_password(password: str) -> str:
-    return bcrypt.hash(password)
+    return pwd_context.hash(password)
 
 def verify_password(password: str, hash_val: str) -> bool:
-    return bcrypt.verify(password, hash_val)
+    return pwd_context.verify(password, hash_val)
 
 # --- OTP handling ---
 def generate_otp_code(length=6):
@@ -78,4 +80,3 @@ def generate_upi_qr(vpa, name, amount, note="Payment"):
     img.save(buf, format="PNG")
     buf.seek(0)
     return buf
-
