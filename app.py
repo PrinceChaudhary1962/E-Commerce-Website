@@ -49,7 +49,7 @@ def login():
         if user and utils.verify_password(password, user.password_hash):
             st.session_state["user"] = user
             st.success(f"Logged in as {user.role}")
-            st.experimental_rerun()  # triggers dashboard reload
+            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
 
@@ -85,7 +85,7 @@ def signup():
                 st.session_state["signup_pass"] = ""
                 st.session_state["signup_otp"] = ""
                 st.session_state["otp_code"] = None
-                st.experimental_rerun()  # reload to login screen
+                st.experimental_rerun()
         else:
             st.error("Invalid OTP")
 
@@ -95,21 +95,42 @@ def signup():
 def admin_dashboard():
     st.subheader("Admin Dashboard")
 
-    st.write("Add Product")
-    name = st.text_input("Product Name", key="prod_name")
-    price = st.number_input("Price", min_value=0.0, key="prod_price")
-    desc = st.text_area("Description", key="prod_desc")
-    if st.button("Add Product"):
-        if DB.query(Product).filter(Product.name==name).first():
-            st.error("Product with this name already exists.")
-        else:
-            prod = Product(name=name, price=price, description=desc)
-            DB.add(prod)
+    st.write("### Add Products in Bulk")
+    num_products = st.number_input("How many products to add?", min_value=1, max_value=10, step=1, key="num_products")
+    
+    with st.form("add_products_form"):
+        product_entries = []
+        for i in range(num_products):
+            st.write(f"**Product {i+1}**")
+            name = st.text_input(f"Name {i+1}", key=f"name_{i}")
+            price = st.number_input(f"Price {i+1}", min_value=0.0, step=1.0, key=f"price_{i}")
+            desc = st.text_area(f"Description {i+1}", key=f"desc_{i}")
+            img_file = st.file_uploader(f"Image {i+1} (optional)", type=["png","jpg","jpeg"], key=f"img_{i}")
+            product_entries.append({
+                "name": name,
+                "price": price,
+                "desc": desc,
+                "img": img_file
+            })
+        submitted = st.form_submit_button("Add Products")
+        if submitted:
+            for prod in product_entries:
+                if prod["name"].strip() == "":
+                    continue
+                if DB.query(Product).filter(Product.name==prod["name"]).first():
+                    st.warning(f"Product '{prod['name']}' already exists. Skipped.")
+                    continue
+                new_prod = Product(
+                    name=prod["name"],
+                    price=prod["price"],
+                    description=prod["desc"]
+                )
+                DB.add(new_prod)
             DB.commit()
-            st.success("Product added")
+            st.success("Products added successfully!")
 
     st.write("---")
-    st.write("Delete Product")
+    st.write("### Delete Product")
     products = DB.query(Product).all()
     product_names = [p.name for p in products]
     if product_names:
@@ -129,7 +150,6 @@ def customer_dashboard():
     st.subheader("Products")
     products = DB.query(Product).all()
 
-    # --- Product listing and add-to-cart form ---
     with st.form("add_to_cart_form"):
         qty_dict = {}
         for p in products:
@@ -143,7 +163,6 @@ def customer_dashboard():
                     st.session_state["cart"][pid] = st.session_state["cart"].get(pid, 0) + qty
             st.success("Products added to cart!")
 
-    # --- Cart display ---
     st.write("---")
     st.subheader("Cart")
     if st.session_state["cart"]:
@@ -177,7 +196,7 @@ if st.session_state["user"]:
     if st.button("Logout"):
         st.session_state["user"] = None
         st.session_state["cart"] = {}
-        st.experimental_rerun()  # reload login/signup
+        st.experimental_rerun()
 else:
     tab = st.radio("Choose", ["Login", "Sign Up"])
     if tab=="Login":
