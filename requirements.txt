@@ -1,7 +1,6 @@
 streamlit
 sqlalchemy
-passlib
+passlib[bcrypt]
+bcrypt
 qrcode[pil]
 pyngrok
-
-
