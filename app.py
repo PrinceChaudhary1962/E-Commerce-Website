@@ -7,7 +7,7 @@ import datetime
 # -----------------------
 # Initialize DB and seed admin
 # -----------------------
-Base.metadata.create_all(engine)  # create tables if not exist
+Base.metadata.create_all(engine)
 DB = sessionmaker(bind=engine)()
 
 # Seed admin
@@ -23,14 +23,11 @@ if not DB.query(User).filter(User.email=="admin@example.com").first():
     print("Admin created: admin@example.com / adminpass")
 
 # -----------------------
-# Session state
+# Session state defaults
 # -----------------------
-if "user" not in st.session_state:
-    st.session_state["user"] = None
-if "cart" not in st.session_state:
-    st.session_state["cart"] = {}
-if "otp_code" not in st.session_state:
-    st.session_state["otp_code"] = None
+for key in ["user", "cart", "otp_code", "signup_email", "signup_pass", "signup_otp"]:
+    if key not in st.session_state:
+        st.session_state[key] = None if key == "user" else {}
 
 # -----------------------
 # Authentication
@@ -53,26 +50,32 @@ def signup():
     password = st.text_input("Password", type="password", key="signup_pass")
     
     if st.button("Send OTP"):
-        otp_code = utils.create_and_send_otp(email)  # returns string
-        st.session_state["otp_code"] = otp_code
-        st.info(f"OTP sent to your email. (Dev: {otp_code})")  # for dev/testing
+        if DB.query(User).filter(User.email==email).first():
+            st.error("Email already registered. Please login.")
+        else:
+            otp_code = utils.create_and_send_otp(email)
+            st.session_state["otp_code"] = otp_code
+            st.info(f"OTP sent to your email. (Dev: {otp_code})")  # for dev/testing
 
     otp = st.text_input("Enter OTP", key="signup_otp")
     if st.button("Verify & Sign Up"):
         if otp == st.session_state.get("otp_code"):
-            new_user = User(
-                email=email,
-                password_hash=utils.hash_password(password),
-                is_verified=True
-            )
-            DB.add(new_user)
-            DB.commit()
-            st.success("Signup successful! Please login.")
-            # clear session state keys safely
-            st.session_state["signup_email"] = ""
-            st.session_state["signup_pass"] = ""
-            st.session_state["signup_otp"] = ""
-            st.session_state["otp_code"] = None
+            if DB.query(User).filter(User.email==email).first():
+                st.error("Email already registered. Please login.")
+            else:
+                new_user = User(
+                    email=email,
+                    password_hash=utils.hash_password(password),
+                    is_verified=True
+                )
+                DB.add(new_user)
+                DB.commit()
+                st.success("Signup successful! Please login.")
+                # Clear session state
+                st.session_state["signup_email"] = ""
+                st.session_state["signup_pass"] = ""
+                st.session_state["signup_otp"] = ""
+                st.session_state["otp_code"] = None
         else:
             st.error("Invalid OTP")
 
@@ -87,10 +90,13 @@ def admin_dashboard():
     price = st.number_input("Price", min_value=0.0, key="prod_price")
     desc = st.text_area("Description", key="prod_desc")
     if st.button("Add Product"):
-        prod = Product(name=name, price=price, description=desc)
-        DB.add(prod)
-        DB.commit()
-        st.success("Product added")
+        if DB.query(Product).filter(Product.name==name).first():
+            st.error("Product with this name already exists.")
+        else:
+            prod = Product(name=name, price=price, description=desc)
+            DB.add(prod)
+            DB.commit()
+            st.success("Product added")
 
     st.write("---")
     st.write("Delete Product")
