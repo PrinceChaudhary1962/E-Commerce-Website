@@ -26,9 +26,11 @@ if not DB.query(User).filter(User.email=="admin@example.com").first():
 # Session state
 # -----------------------
 if "user" not in st.session_state:
-    st.session_state.user = None
+    st.session_state["user"] = None
 if "cart" not in st.session_state:
-    st.session_state.cart = {}
+    st.session_state["cart"] = {}
+if "otp_code" not in st.session_state:
+    st.session_state["otp_code"] = None
 
 # -----------------------
 # Authentication
@@ -40,7 +42,7 @@ def login():
     if st.button("Login"):
         user = DB.query(User).filter(User.email==email).first()
         if user and utils.verify_password(password, user.password_hash):
-            st.session_state.user = user
+            st.session_state["user"] = user
             st.success(f"Logged in as {user.role}")
         else:
             st.error("Invalid credentials")
@@ -52,7 +54,7 @@ def signup():
     
     if st.button("Send OTP"):
         otp_code = utils.create_and_send_otp(email)  # returns string
-        st.session_state.otp_code = otp_code
+        st.session_state["otp_code"] = otp_code
         st.info(f"OTP sent to your email. (Dev: {otp_code})")  # for dev/testing
 
     otp = st.text_input("Enter OTP", key="signup_otp")
@@ -66,11 +68,11 @@ def signup():
             DB.add(new_user)
             DB.commit()
             st.success("Signup successful! Please login.")
-            # clear OTP and inputs
-            st.session_state.otp_code = None
-            st.session_state.signup_email = ""
-            st.session_state.signup_pass = ""
-            st.session_state.signup_otp = ""
+            # clear session state keys safely
+            st.session_state["signup_email"] = ""
+            st.session_state["signup_pass"] = ""
+            st.session_state["signup_otp"] = ""
+            st.session_state["otp_code"] = None
         else:
             st.error("Invalid OTP")
 
@@ -114,13 +116,13 @@ def customer_dashboard():
         st.write(f"**{p.name}** - ₹{p.price}")
         st.write(p.description)
         if st.button(f"Add to Cart: {p.name}"):
-            st.session_state.cart[p.id] = st.session_state.cart.get(p.id, 0)+1
+            st.session_state["cart"][p.id] = st.session_state["cart"].get(p.id, 0)+1
 
     st.write("---")
     st.subheader("Cart")
-    if st.session_state.cart:
+    if st.session_state["cart"]:
         total = 0
-        for pid, qty in st.session_state.cart.items():
+        for pid, qty in st.session_state["cart"].items():
             prod = DB.query(Product).filter(Product.id==pid).first()
             st.write(f"{prod.name} x {qty} = ₹{prod.price*qty}")
             total += prod.price*qty
@@ -141,14 +143,14 @@ def customer_dashboard():
 # -----------------------
 st.title("Mini E-commerce App")
 
-if st.session_state.user:
-    if st.session_state.user.role == "admin":
+if st.session_state["user"]:
+    if st.session_state["user"].role == "admin":
         admin_dashboard()
     else:
         customer_dashboard()
     if st.button("Logout"):
-        st.session_state.user = None
-        st.session_state.cart = {}
+        st.session_state["user"] = None
+        st.session_state["cart"] = {}
 else:
     tab = st.radio("Choose", ["Login", "Sign Up"])
     if tab=="Login":
