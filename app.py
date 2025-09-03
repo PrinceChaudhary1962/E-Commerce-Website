@@ -1,8 +1,8 @@
 import streamlit as st
 from sqlalchemy.orm import sessionmaker
-from models import Base, engine, User, Product, Address, Order, OrderItem
+from models import Base, engine, User, Product
 import utils
-import datetime
+import os
 
 # -----------------------
 # Initialize DB and seed admin
@@ -21,6 +21,12 @@ if not DB.query(User).filter(User.email=="vivv.plays@gmail.com").first():
     DB.add(admin)
     DB.commit()
     print("Admin created: vivv.plays@gmail.com / adminpass")
+
+# -----------------------
+# Ensure image folder exists
+# -----------------------
+if not os.path.exists("images"):
+    os.makedirs("images")
 
 # -----------------------
 # Session state defaults
@@ -82,7 +88,6 @@ def signup():
                 DB.add(new_user)
                 DB.commit()
                 st.success("Signup successful! Please login.")
-                # reset session state for signup
                 st.session_state["signup_email"] = ""
                 st.session_state["signup_pass"] = ""
                 st.session_state["signup_otp"] = ""
@@ -96,40 +101,35 @@ def signup():
 # -----------------------
 def admin_dashboard():
     st.subheader("Admin Dashboard")
-
-    st.write("### Add Products in Bulk")
-    num_products = st.number_input("How many products to add?", min_value=1, max_value=10, step=1, key="num_products")
+    st.write("### Add Products")
     
     with st.form("add_products_form"):
-        product_entries = []
-        for i in range(num_products):
-            st.write(f"**Product {i+1}**")
-            name = st.text_input(f"Name {i+1}", key=f"name_{i}")
-            price = st.number_input(f"Price {i+1}", min_value=0.0, step=1.0, key=f"price_{i}")
-            desc = st.text_area(f"Description {i+1}", key=f"desc_{i}")
-            img_file = st.file_uploader(f"Image {i+1} (optional)", type=["png","jpg","jpeg"], key=f"img_{i}")
-            product_entries.append({
-                "name": name,
-                "price": price,
-                "desc": desc,
-                "img": img_file
-            })
-        submitted = st.form_submit_button("Add Products")
+        name = st.text_input("Product Name")
+        price = st.number_input("Price", min_value=0.0, step=1.0)
+        desc = st.text_area("Description")
+        img_file = st.file_uploader("Image (optional)", type=["png","jpg","jpeg"])
+        submitted = st.form_submit_button("Add Product")
         if submitted:
-            for prod in product_entries:
-                if prod["name"].strip() == "":
-                    continue
-                if DB.query(Product).filter(Product.name==prod["name"]).first():
-                    st.warning(f"Product '{prod['name']}' already exists. Skipped.")
-                    continue
+            if DB.query(Product).filter(Product.name==name).first():
+                st.warning("Product already exists. Skipped.")
+            else:
+                image_path = None
+                if img_file:
+                    # Save image
+                    img_path = os.path.join("images", img_file.name)
+                    with open(img_path, "wb") as f:
+                        f.write(img_file.getbuffer())
+                    image_path = img_path
+
                 new_prod = Product(
-                    name=prod["name"],
-                    price=prod["price"],
-                    description=prod["desc"]
+                    name=name,
+                    price=price,
+                    description=desc,
+                    image_path=image_path  # store path in DB
                 )
                 DB.add(new_prod)
-            DB.commit()
-            st.success("Products added successfully!")
+                DB.commit()
+                st.success(f"Product '{name}' added!")
 
     st.write("---")
     st.write("### Delete Product")
@@ -161,7 +161,7 @@ def customer_dashboard():
         for p in products:
             st.write(f"**{p.name}** - ₹{p.price}")
             st.write(p.description)
-            if hasattr(p, "image_path") and p.image_path:  # optional image display
+            if getattr(p, "image_path", None):
                 st.image(p.image_path, width=200)
             qty_dict[p.id] = st.number_input(f"Qty for {p.name}", min_value=0, step=1, key=f"qty_{p.id}")
         submitted = st.form_submit_button("Add Selected Products to Cart")
@@ -180,14 +180,6 @@ def customer_dashboard():
             st.write(f"{prod.name} x {qty} = ₹{prod.price*qty}")
             total += prod.price*qty
         st.write(f"**Total: ₹{total}**")
-
-        st.write("---")
-        st.subheader("Checkout / Payment")
-        vpa = st.text_input("Enter UPI VPA (e.g., example@upi)")
-        name = st.text_input("Name on UPI")
-        if st.button("Generate UPI QR"):
-            buf = utils.generate_upi_qr(vpa, name, total)
-            st.image(buf)
     else:
         st.info("Cart is empty")
 
@@ -196,7 +188,6 @@ def customer_dashboard():
 # -----------------------
 st.title("Mini E-commerce App")
 
-# fetch current user from session
 current_user = None
 if st.session_state["user_id"]:
     current_user = DB.query(User).filter(User.id==st.session_state["user_id"]).first()
