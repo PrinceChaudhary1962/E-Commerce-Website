@@ -10,23 +10,17 @@ import datetime
 Base.metadata.create_all(engine)
 DB = sessionmaker(bind=engine)()
 
-# -----------------------
-# Set your special admin email here
-# -----------------------
-SPECIAL_ADMIN_EMAIL = "vivv.plays@gmail.com"
-SPECIAL_ADMIN_PASSWORD = "adminpass"
-
-# Seed admin if not exists
-if not DB.query(User).filter(User.email==SPECIAL_ADMIN_EMAIL).first():
+# Seed admin account
+if not DB.query(User).filter(User.email=="vivv.plays@egmail.com").first():
     admin = User(
-        email=SPECIAL_ADMIN_EMAIL,
-        password_hash=utils.hash_password(SPECIAL_ADMIN_PASSWORD),
+        email="admin@example.com",
+        password_hash=utils.hash_password("adminpass"),
         role="admin",
         is_verified=True
     )
     DB.add(admin)
     DB.commit()
-    print(f"Admin created: {SPECIAL_ADMIN_EMAIL} / {SPECIAL_ADMIN_PASSWORD}")
+    print("Admin created: admin@example.com / adminpass")
 
 # -----------------------
 # Session state defaults
@@ -55,7 +49,7 @@ def login():
         if user and utils.verify_password(password, user.password_hash):
             st.session_state["user"] = user
             st.success(f"Logged in as {user.role}")
-            st.experimental_rerun()
+            st.stop()  # refresh UI safely
         else:
             st.error("Invalid credentials")
 
@@ -78,22 +72,20 @@ def signup():
             if DB.query(User).filter(User.email==email).first():
                 st.error("Email already registered. Please login.")
             else:
-                # Assign role admin automatically for the special email
-                role = "admin" if email == SPECIAL_ADMIN_EMAIL else "customer"
                 new_user = User(
                     email=email,
                     password_hash=utils.hash_password(password),
-                    role=role,
                     is_verified=True
                 )
                 DB.add(new_user)
                 DB.commit()
                 st.success("Signup successful! Please login.")
+                # reset session state for signup
                 st.session_state["signup_email"] = ""
                 st.session_state["signup_pass"] = ""
                 st.session_state["signup_otp"] = ""
                 st.session_state["otp_code"] = None
-                st.experimental_rerun()
+                st.stop()
         else:
             st.error("Invalid OTP")
 
@@ -204,7 +196,7 @@ if st.session_state["user"]:
     if st.button("Logout"):
         st.session_state["user"] = None
         st.session_state["cart"] = {}
-        st.experimental_rerun()
+        st.stop()  # clean rerun
 else:
     tab = st.radio("Choose", ["Login", "Sign Up"])
     if tab=="Login":
