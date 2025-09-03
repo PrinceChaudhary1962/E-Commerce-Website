@@ -10,17 +10,23 @@ import datetime
 Base.metadata.create_all(engine)
 DB = sessionmaker(bind=engine)()
 
-# Seed admin
-if not DB.query(User).filter(User.email=="admin@example.com").first():
+# -----------------------
+# Set your special admin email here
+# -----------------------
+SPECIAL_ADMIN_EMAIL = "myadmin@example.com"
+SPECIAL_ADMIN_PASSWORD = "adminpass"
+
+# Seed admin if not exists
+if not DB.query(User).filter(User.email==SPECIAL_ADMIN_EMAIL).first():
     admin = User(
-        email="admin@example.com",
-        password_hash=utils.hash_password("adminpass"),
+        email=SPECIAL_ADMIN_EMAIL,
+        password_hash=utils.hash_password(SPECIAL_ADMIN_PASSWORD),
         role="admin",
         is_verified=True
     )
     DB.add(admin)
     DB.commit()
-    print("Admin created: admin@example.com / adminpass")
+    print(f"Admin created: {SPECIAL_ADMIN_EMAIL} / {SPECIAL_ADMIN_PASSWORD}")
 
 # -----------------------
 # Session state defaults
@@ -72,9 +78,12 @@ def signup():
             if DB.query(User).filter(User.email==email).first():
                 st.error("Email already registered. Please login.")
             else:
+                # Assign role admin automatically for the special email
+                role = "admin" if email == SPECIAL_ADMIN_EMAIL else "customer"
                 new_user = User(
                     email=email,
                     password_hash=utils.hash_password(password),
+                    role=role,
                     is_verified=True
                 )
                 DB.add(new_user)
