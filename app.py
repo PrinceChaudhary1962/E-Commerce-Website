@@ -49,7 +49,7 @@ def login():
         if user and utils.verify_password(password, user.password_hash):
             st.session_state["user"] = user
             st.success(f"Logged in as {user.role}")
-            st.experimental_rerun()  # <-- triggers dashboard reload
+            st.experimental_rerun()  # triggers dashboard reload
         else:
             st.error("Invalid credentials")
 
@@ -85,7 +85,7 @@ def signup():
                 st.session_state["signup_pass"] = ""
                 st.session_state["signup_otp"] = ""
                 st.session_state["otp_code"] = None
-                st.experimental_rerun()  # <-- reload to login screen
+                st.experimental_rerun()  # reload to login screen
         else:
             st.error("Invalid OTP")
 
@@ -128,12 +128,22 @@ def admin_dashboard():
 def customer_dashboard():
     st.subheader("Products")
     products = DB.query(Product).all()
-    for p in products:
-        st.write(f"**{p.name}** - ₹{p.price}")
-        st.write(p.description)
-        if st.button(f"Add to Cart: {p.name}"):
-            st.session_state["cart"][p.id] = st.session_state["cart"].get(p.id, 0)+1
 
+    # --- Product listing and add-to-cart form ---
+    with st.form("add_to_cart_form"):
+        qty_dict = {}
+        for p in products:
+            st.write(f"**{p.name}** - ₹{p.price}")
+            st.write(p.description)
+            qty_dict[p.id] = st.number_input(f"Qty for {p.name}", min_value=0, step=1, key=f"qty_{p.id}")
+        submitted = st.form_submit_button("Add Selected Products to Cart")
+        if submitted:
+            for pid, qty in qty_dict.items():
+                if qty > 0:
+                    st.session_state["cart"][pid] = st.session_state["cart"].get(pid, 0) + qty
+            st.success("Products added to cart!")
+
+    # --- Cart display ---
     st.write("---")
     st.subheader("Cart")
     if st.session_state["cart"]:
@@ -167,7 +177,7 @@ if st.session_state["user"]:
     if st.button("Logout"):
         st.session_state["user"] = None
         st.session_state["cart"] = {}
-        st.experimental_rerun()  # <-- reload login/signup
+        st.experimental_rerun()  # reload login/signup
 else:
     tab = st.radio("Choose", ["Login", "Sign Up"])
     if tab=="Login":
