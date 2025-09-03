@@ -13,7 +13,7 @@ DB = sessionmaker(bind=engine)()
 # -----------------------
 # Set your special admin email here
 # -----------------------
-SPECIAL_ADMIN_EMAIL = "myadmin@example.com"
+SPECIAL_ADMIN_EMAIL = "vivv.plays@gmail.com"
 SPECIAL_ADMIN_PASSWORD = "adminpass"
 
 # Seed admin if not exists
