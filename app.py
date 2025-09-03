@@ -80,7 +80,6 @@ def signup():
                 DB.add(new_user)
                 DB.commit()
                 st.success("Signup successful! Please login.")
-                # clear session state keys
                 st.session_state["signup_email"] = ""
                 st.session_state["signup_pass"] = ""
                 st.session_state["signup_otp"] = ""
