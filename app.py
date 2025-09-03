@@ -5,33 +5,37 @@ import utils
 import os
 
 # -----------------------
-# Initialize DB and seed admin
+# Initialize DB
 # -----------------------
 Base.metadata.create_all(engine)
 DB = sessionmaker(bind=engine)()
 
-# Seed admin account
-if not DB.query(User).filter(User.email=="vivv.plays@gmail.com").first():
+# -----------------------
+# Seed Admin
+# -----------------------
+ADMIN_EMAIL = "vivv.plays@gmail.com"
+if not DB.query(User).filter(User.email==ADMIN_EMAIL).first():
     admin = User(
-        email="vivv.plays@gmail.com",
+        email=ADMIN_EMAIL,
         password_hash=utils.hash_password("adminpass"),
         role="admin",
         is_verified=True
     )
     DB.add(admin)
     DB.commit()
-    print("Admin created: vivv.plays@gmail.com / adminpass")
+    print(f"Admin created: {ADMIN_EMAIL} / adminpass")
 
 # -----------------------
 # Ensure image folder exists
 # -----------------------
-if not os.path.exists("images"):
-    os.makedirs("images")
+UPLOAD_FOLDER = "images"
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # -----------------------
-# Session state defaults
+# Session defaults
 # -----------------------
-defaults = {
+for key, val in {
     "user_id": None,
     "user_role": None,
     "cart": {},
@@ -39,8 +43,7 @@ defaults = {
     "signup_email": "",
     "signup_pass": "",
     "signup_otp": ""
-}
-for key, val in defaults.items():
+}.items():
     if key not in st.session_state:
         st.session_state[key] = val
 
@@ -72,7 +75,7 @@ def signup():
         else:
             otp_code = utils.create_and_send_otp(email)
             st.session_state["otp_code"] = otp_code
-            st.info(f"OTP sent to your email. (Dev: {otp_code})")  # for dev/testing
+            st.info(f"OTP sent to your email. (Dev: {otp_code})")  # dev/testing
 
     otp = st.text_input("Enter OTP", key="signup_otp")
     if st.button("Verify & Sign Up"):
@@ -88,10 +91,12 @@ def signup():
                 DB.add(new_user)
                 DB.commit()
                 st.success("Signup successful! Please login.")
-                st.session_state["signup_email"] = ""
-                st.session_state["signup_pass"] = ""
-                st.session_state["signup_otp"] = ""
-                st.session_state["otp_code"] = None
+                st.session_state.update({
+                    "signup_email": "",
+                    "signup_pass": "",
+                    "signup_otp": "",
+                    "otp_code": None
+                })
                 st.experimental_rerun()
         else:
             st.error("Invalid OTP")
@@ -102,7 +107,7 @@ def signup():
 def admin_dashboard():
     st.subheader("Admin Dashboard")
     st.write("### Add Products")
-    
+
     with st.form("add_products_form"):
         name = st.text_input("Product Name")
         price = st.number_input("Price", min_value=0.0, step=1.0)
@@ -115,17 +120,14 @@ def admin_dashboard():
             else:
                 image_path = None
                 if img_file:
-                    # Save image
-                    img_path = os.path.join("images", img_file.name)
-                    with open(img_path, "wb") as f:
+                    image_path = os.path.join(UPLOAD_FOLDER, img_file.name)
+                    with open(image_path, "wb") as f:
                         f.write(img_file.getbuffer())
-                    image_path = img_path
-
                 new_prod = Product(
                     name=name,
                     price=price,
                     description=desc,
-                    image_path=image_path  # store path in DB
+                    image_path=image_path
                 )
                 DB.add(new_prod)
                 DB.commit()
@@ -161,7 +163,7 @@ def customer_dashboard():
         for p in products:
             st.write(f"**{p.name}** - ₹{p.price}")
             st.write(p.description)
-            if getattr(p, "image_path", None):
+            if getattr(p, "image_path", None) and os.path.exists(p.image_path):
                 st.image(p.image_path, width=200)
             qty_dict[p.id] = st.number_input(f"Qty for {p.name}", min_value=0, step=1, key=f"qty_{p.id}")
         submitted = st.form_submit_button("Add Selected Products to Cart")
