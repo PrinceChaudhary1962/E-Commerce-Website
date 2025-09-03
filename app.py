@@ -1,14 +1,8 @@
-import os
 import streamlit as st
 from sqlalchemy.orm import sessionmaker
-from models import Base, engine, User, Product
+from models import Base, engine, User, Product, Address, Order, OrderItem
 import utils
-
-# -----------------------
-# Ensure product_images folder exists
-# -----------------------
-if not os.path.exists("product_images"):
-    os.makedirs("product_images")
+import datetime
 
 # -----------------------
 # Initialize DB and seed admin
@@ -17,23 +11,23 @@ Base.metadata.create_all(engine)
 DB = sessionmaker(bind=engine)()
 
 # Seed admin account
-admin_email = "vivv.plays@gmail.com"
-if not DB.query(User).filter(User.email==admin_email).first():
+if not DB.query(User).filter(User.email=="vivv.plays@gmail.com").first():
     admin = User(
-        email=admin_email,
+        email="vivv.plays@gmail.com",
         password_hash=utils.hash_password("adminpass"),
         role="admin",
         is_verified=True
     )
     DB.add(admin)
     DB.commit()
-    print(f"Admin created: {admin_email} / adminpass")
+    print("Admin created: vivv.plays@gmail.com / adminpass")
 
 # -----------------------
 # Session state defaults
 # -----------------------
 defaults = {
-    "user": None,
+    "user_id": None,
+    "user_role": None,
     "cart": {},
     "otp_code": None,
     "signup_email": "",
@@ -54,9 +48,10 @@ def login():
     if st.button("Login"):
         user = DB.query(User).filter(User.email==email).first()
         if user and utils.verify_password(password, user.password_hash):
-            st.session_state["user"] = user
+            st.session_state["user_id"] = user.id
+            st.session_state["user_role"] = user.role
             st.success(f"Logged in as {user.role}")
-            st.experimental_rerun()  # refresh UI
+            st.experimental_rerun()
         else:
             st.error("Invalid credentials")
 
@@ -71,7 +66,7 @@ def signup():
         else:
             otp_code = utils.create_and_send_otp(email)
             st.session_state["otp_code"] = otp_code
-            st.info(f"OTP sent to your email. (Dev: {otp_code})")
+            st.info(f"OTP sent to your email. (Dev: {otp_code})")  # for dev/testing
 
     otp = st.text_input("Enter OTP", key="signup_otp")
     if st.button("Verify & Sign Up"):
@@ -87,7 +82,7 @@ def signup():
                 DB.add(new_user)
                 DB.commit()
                 st.success("Signup successful! Please login.")
-                # reset session state
+                # reset session state for signup
                 st.session_state["signup_email"] = ""
                 st.session_state["signup_pass"] = ""
                 st.session_state["signup_otp"] = ""
@@ -113,7 +108,12 @@ def admin_dashboard():
             price = st.number_input(f"Price {i+1}", min_value=0.0, step=1.0, key=f"price_{i}")
             desc = st.text_area(f"Description {i+1}", key=f"desc_{i}")
             img_file = st.file_uploader(f"Image {i+1} (optional)", type=["png","jpg","jpeg"], key=f"img_{i}")
-            product_entries.append({"name": name, "price": price, "desc": desc, "img": img_file})
+            product_entries.append({
+                "name": name,
+                "price": price,
+                "desc": desc,
+                "img": img_file
+            })
         submitted = st.form_submit_button("Add Products")
         if submitted:
             for prod in product_entries:
@@ -122,20 +122,10 @@ def admin_dashboard():
                 if DB.query(Product).filter(Product.name==prod["name"]).first():
                     st.warning(f"Product '{prod['name']}' already exists. Skipped.")
                     continue
-
-                # Save image if uploaded
-                img_path = None
-                if prod["img"] is not None:
-                    ext = prod["img"].name.split(".")[-1]
-                    img_path = os.path.join("product_images", f"{prod['name']}.{ext}")
-                    with open(img_path, "wb") as f:
-                        f.write(prod["img"].getbuffer())
-
                 new_prod = Product(
                     name=prod["name"],
                     price=prod["price"],
-                    description=prod["desc"],
-                    image_path=img_path  # make sure models.py has image_path
+                    description=prod["desc"]
                 )
                 DB.add(new_prod)
             DB.commit()
@@ -149,8 +139,6 @@ def admin_dashboard():
         del_name = st.selectbox("Select product to delete", product_names)
         if st.button("Delete Product"):
             prod = DB.query(Product).filter(Product.name==del_name).first()
-            if prod.image_path and os.path.exists(prod.image_path):
-                os.remove(prod.image_path)
             DB.delete(prod)
             DB.commit()
             st.success(f"{del_name} deleted")
@@ -164,12 +152,16 @@ def customer_dashboard():
     st.subheader("Products")
     products = DB.query(Product).all()
 
+    if not products:
+        st.info("No products available yet.")
+        return
+
     with st.form("add_to_cart_form"):
         qty_dict = {}
         for p in products:
             st.write(f"**{p.name}** - ₹{p.price}")
             st.write(p.description)
-            if p.image_path and os.path.exists(p.image_path):
+            if hasattr(p, "image_path") and p.image_path:  # optional image display
                 st.image(p.image_path, width=200)
             qty_dict[p.id] = st.number_input(f"Qty for {p.name}", min_value=0, step=1, key=f"qty_{p.id}")
         submitted = st.form_submit_button("Add Selected Products to Cart")
@@ -204,13 +196,20 @@ def customer_dashboard():
 # -----------------------
 st.title("Mini E-commerce App")
 
-if st.session_state["user"]:
-    if st.session_state["user"].role == "admin":
+# fetch current user from session
+current_user = None
+if st.session_state["user_id"]:
+    current_user = DB.query(User).filter(User.id==st.session_state["user_id"]).first()
+
+if current_user:
+    if st.session_state["user_role"] == "admin":
         admin_dashboard()
     else:
         customer_dashboard()
+
     if st.button("Logout"):
-        st.session_state["user"] = None
+        st.session_state["user_id"] = None
+        st.session_state["user_role"] = None
         st.session_state["cart"] = {}
         st.experimental_rerun()
 else:
